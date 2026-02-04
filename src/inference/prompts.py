@@ -20,7 +20,7 @@ Respond ONLY with a JSON action. Do not explain your reasoning."""
 
 # Action prompt template
 ACTION_PROMPT = """Current state:
-- Energy: {energy}/100 {"(CRITICAL - you are starving!)" if energy < 20 else "(hungry)" if energy < 40 else ""}
+- Energy: {energy}/100 {energy_status}
 - Age: {age} seasons
 - Location: {terrain_type} terrain
 
@@ -115,8 +115,18 @@ def build_prompt(
     else:
         memory_str = "- (no recent memories)"
 
+    # Energy status text
+    energy = int(agent_state.get('energy', 100))
+    if energy < 20:
+        energy_status = "(CRITICAL - you are starving!)"
+    elif energy < 40:
+        energy_status = "(hungry)"
+    else:
+        energy_status = ""
+
     return ACTION_PROMPT.format(
-        energy=int(agent_state.get('energy', 100)),
+        energy=energy,
+        energy_status=energy_status,
         age=agent_state.get('age', 0) // 365,  # Convert ticks to "seasons"
         terrain_type=terrain_type,
         inventory=inv_str,
