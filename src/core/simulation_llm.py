@@ -249,13 +249,14 @@ class LLMSimulation(Simulation):
 
                 # Handle memory inheritance for Tier 1 agents
                 if self.agent_arrays.tier[idx] == AgentTier.TIER1:
-                    # Find living children (agents with this agent as parent)
+                    # Find living children from AgentState objects
                     child_ids = []
-                    for other_idx in self.agent_arrays.get_alive_indices():
-                        if other_idx != idx:
-                            p1, p2 = self.agent_arrays.parent_ids[other_idx]
-                            if p1 == agent_id or p2 == agent_id:
-                                child_ids.append(int(self.agent_arrays.ids[other_idx]))
+                    for other_id, other_state in self.world_state.agents.items():
+                        if other_id != agent_id and other_id in self.agent_arrays.id_to_index:
+                            other_idx = self.agent_arrays.id_to_index[other_id]
+                            if self.agent_arrays.alive[other_idx]:
+                                if agent_id in other_state.parent_ids:
+                                    child_ids.append(other_id)
 
                     if child_ids:
                         self.tier1_processor.handle_agent_death(
