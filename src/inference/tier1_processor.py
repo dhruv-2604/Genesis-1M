@@ -6,6 +6,7 @@ import numpy as np
 
 from ..core.state import AgentState, AgentArrays, WorldState, AgentTier, FSMState, GeneIndex
 from ..world.resources import ResourceType
+from ..memory import MemoryManager, MemoryType
 from .vllm_backend import VLLMBackend, MockVLLMBackend, InferenceResponse, create_backend
 from .promotion import PromotionScorer, PromotionCandidate
 from .prompts import build_prompt, build_system_prompt, PRIMITIVE_HUMAN_SYSTEM
@@ -39,11 +40,13 @@ class Tier1Processor:
         self,
         backend: Optional[VLLMBackend] = None,
         scorer: Optional[PromotionScorer] = None,
+        memory_manager: Optional[MemoryManager] = None,
         use_mock: bool = False,
         promotion_budget: int = 500,
     ):
         self.backend = backend or create_backend(use_mock=use_mock)
         self.scorer = scorer or PromotionScorer(global_budget=promotion_budget)
+        self.memory = memory_manager or MemoryManager(use_mock=use_mock)
 
         # Track active Tier 1 agents
         self.tier1_agents: Dict[int, Dict[str, Any]] = {}
@@ -55,6 +58,7 @@ class Tier1Processor:
         self.total_promotions = 0
         self.total_demotions = 0
         self.total_actions_applied = 0
+        self.total_memories_created = 0
 
     def process_tick(
         self,
@@ -112,8 +116,8 @@ class Tier1Processor:
             resources = resource_data.get(agent_id, {})
             terrain = terrain_data.get(agent_id, "PLAINS")
 
-            # Get recent memories (placeholder for Phase 3)
-            memories = self._get_memories(agent_id)
+            # Get recent memories for prompt context
+            memories = self._get_memories(agent_id, neighbors, current_tick)
 
             # Build prompts
             system_prompt = build_system_prompt(agent_data)
@@ -204,8 +208,17 @@ class Tier1Processor:
         elif action_type in ["approach", "follow"]:
             if action.target_id and action.target_id in arrays.id_to_index:
                 tidx = arrays.id_to_index[action.target_id]
-                # Set target position
-                # (actual movement handled by FSM)
+                # Record social interaction
+                self.memory.record_interaction(
+                    agent_id=action.agent_id,
+                    other_agent_id=action.target_id,
+                    tick=world_state.tick,
+                    action=f"approached",
+                    outcome="Moving closer",
+                    valence=0.1,
+                    location=(float(arrays.x[idx]), float(arrays.y[idx])),
+                )
+                self.total_memories_created += 1
             arrays.fsm_state[idx] = FSMState.WANDER
 
         elif action_type == "flee":
@@ -230,14 +243,51 @@ class Tier1Processor:
                 arrays.energy[idx] -= 10
                 arrays.energy[tidx] -= 10 + (attacker_str - defender_str) * 20
 
-        elif action_type in ["offer_trade", "trade"]:
-            # Trading system placeholder
-            pass
+                # Record conflict memory for both parties
+                won = attacker_str >= defender_str
+                self.memory.record_conflict(
+                    agent_id=action.agent_id,
+                    other_agent_id=action.target_id,
+                    tick=world_state.tick,
+                    won=won,
+                    location=(float(arrays.x[idx]), float(arrays.y[idx])),
+                )
+                self.memory.record_conflict(
+                    agent_id=action.target_id,
+                    other_agent_id=action.agent_id,
+                    tick=world_state.tick,
+                    won=not won,
+                    location=(float(arrays.x[tidx]), float(arrays.y[tidx])),
+                )
+                self.total_memories_created += 2
 
-        # Log speech if present
-        if action.speech:
-            # TODO: Log to event system
-            pass
+        elif action_type in ["offer_trade", "trade"]:
+            # Trading system placeholder - record interaction
+            if action.target_id and action.target_id in arrays.id_to_index:
+                tidx = arrays.id_to_index[action.target_id]
+                self.memory.record_interaction(
+                    agent_id=action.agent_id,
+                    other_agent_id=action.target_id,
+                    tick=world_state.tick,
+                    action="offered to trade",
+                    outcome="Trade initiated",
+                    valence=0.2,
+                    location=(float(arrays.x[idx]), float(arrays.y[idx])),
+                )
+                self.total_memories_created += 1
+
+        # Log speech as an observation memory
+        if action.speech and action.target_id:
+            self.memory.record_interaction(
+                agent_id=action.agent_id,
+                other_agent_id=action.target_id,
+                tick=world_state.tick,
+                action=f"said: '{action.speech[:50]}'",
+                outcome="Spoke to another",
+                valence=0.0,
+                location=(float(arrays.x[idx]), float(arrays.y[idx])),
+            )
+            self.total_memories_created += 1
 
         return True
 
@@ -289,10 +339,36 @@ class Tier1Processor:
                 seekers.add(int(arrays.ids[idx]))
         return seekers
 
-    def _get_memories(self, agent_id: int) -> List[str]:
-        """Get recent memories for agent (Phase 3)"""
-        # Placeholder - will integrate with LanceDB
-        return []
+    def _get_memories(self, agent_id: int, nearby_ids: List[int], current_tick: int) -> List[str]:
+        """Get recent memories for agent"""
+        return self.memory.recall_for_prompt(
+            agent_id=agent_id,
+            current_tick=current_tick,
+            nearby_agent_ids=nearby_ids,
+            limit=5,
+        )
+
+    def flush_memories(self) -> int:
+        """Flush pending memories to storage. Call at end of tick."""
+        return self.memory.flush_pending()
+
+    def handle_agent_death(
+        self,
+        agent_id: int,
+        child_ids: List[int],
+        current_tick: int,
+    ) -> int:
+        """Handle memory inheritance when a Tier 1 agent dies."""
+        # Remove from tier1 tracking
+        if agent_id in self.tier1_agents:
+            del self.tier1_agents[agent_id]
+
+        # Transfer memories to children
+        return self.memory.handle_agent_death(
+            agent_id=agent_id,
+            child_ids=child_ids,
+            current_tick=current_tick,
+        )
 
     def get_stats(self) -> Dict:
         return {
@@ -300,6 +376,8 @@ class Tier1Processor:
             "total_promotions": self.total_promotions,
             "total_demotions": self.total_demotions,
             "total_actions_applied": self.total_actions_applied,
+            "total_memories_created": self.total_memories_created,
             "backend_stats": self.backend.get_stats(),
             "scorer_stats": self.scorer.get_stats(),
+            "memory_stats": self.memory.get_stats(),
         }

@@ -159,8 +159,8 @@ class LLMSimulation(Simulation):
         # 9. Process reproduction
         births = self._process_reproduction()
 
-        # 10. Process deaths
-        deaths = self._process_deaths()
+        # 10. Process deaths (with memory inheritance for Tier 1)
+        deaths = self._process_deaths_with_inheritance()
 
         # 11. Update spatial grid
         self._update_spatial_grid()
@@ -170,6 +170,10 @@ class LLMSimulation(Simulation):
 
         # 13. Regenerate resources
         self.resources.regenerate(self.terrain)
+
+        # 14. Flush pending memories to storage
+        if self.llm_enabled:
+            self.tier1_processor.flush_memories()
 
         # Increment tick
         self.world_state.tick += 1
@@ -228,6 +232,51 @@ class LLMSimulation(Simulation):
             x, y = self.agent_arrays.x[idx], self.agent_arrays.y[idx]
             terrain_data[agent_id] = self.terrain.get_terrain_at(x, y).name
         return terrain_data
+
+    def _process_deaths_with_inheritance(self) -> int:
+        """Process deaths with memory inheritance for Tier 1 agents"""
+        deaths = 0
+        tick = self.world_state.tick
+
+        for idx in self.agent_arrays.get_alive_indices():
+            should_die = (
+                self.agent_arrays.energy[idx] <= 0.5 or
+                self.agent_arrays.age[idx] >= self.config.MAX_AGE
+            )
+
+            if should_die:
+                agent_id = int(self.agent_arrays.ids[idx])
+
+                # Handle memory inheritance for Tier 1 agents
+                if self.agent_arrays.tier[idx] == AgentTier.TIER1:
+                    # Find living children (agents with this agent as parent)
+                    child_ids = []
+                    for other_idx in self.agent_arrays.get_alive_indices():
+                        if other_idx != idx:
+                            p1, p2 = self.agent_arrays.parent_ids[other_idx]
+                            if p1 == agent_id or p2 == agent_id:
+                                child_ids.append(int(self.agent_arrays.ids[other_idx]))
+
+                    if child_ids:
+                        self.tier1_processor.handle_agent_death(
+                            agent_id, child_ids, tick
+                        )
+
+                # Mark as dead
+                self.agent_arrays.alive[idx] = False
+                cause = "starvation" if self.agent_arrays.energy[idx] <= 0.5 else "old_age"
+
+                self.event_logger.log_death(
+                    tick, agent_id,
+                    cause=cause,
+                    age=int(self.agent_arrays.age[idx]),
+                    x=float(self.agent_arrays.x[idx]),
+                    y=float(self.agent_arrays.y[idx])
+                )
+
+                deaths += 1
+
+        return deaths
 
     def _log_summary_llm(self, stats: TickStats, promotions: int) -> None:
         """Log periodic summary with LLM stats"""
