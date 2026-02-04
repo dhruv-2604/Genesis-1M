@@ -122,31 +122,33 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         const ctx = canvas.getContext('2d');
         const scale = canvas.width / worldSize;
 
-        // Draw agents
-        agents.forEach(agent => {{
+        // Draw Tier 3 agents first (circles)
+        agents.filter(a => a.tier !== 1).forEach(agent => {{
             const x = agent.x * scale;
             const y = agent.y * scale;
 
             ctx.beginPath();
 
-            if (agent.tier === 1) {{
-                // Tier 1 - star shape
-                ctx.fillStyle = '#ffd700';
-                drawStar(ctx, x, y, 5, 8, 4);
+            // Color by personality
+            if (agent.aggression > 0.7) {{
+                ctx.fillStyle = '#ff4444';
+            }} else if (agent.altruism > 0.7) {{
+                ctx.fillStyle = '#4444ff';
+            }} else if (agent.sociability > 0.7) {{
+                ctx.fillStyle = '#44ff44';
             }} else {{
-                // Color by personality
-                if (agent.aggression > 0.7) {{
-                    ctx.fillStyle = '#ff4444';
-                }} else if (agent.altruism > 0.7) {{
-                    ctx.fillStyle = '#4444ff';
-                }} else if (agent.sociability > 0.7) {{
-                    ctx.fillStyle = '#44ff44';
-                }} else {{
-                    ctx.fillStyle = '#888888';
-                }}
-                ctx.arc(x, y, 3, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.fillStyle = '#aaaaaa';
             }}
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }});
+
+        // Draw Tier 1 agents on top (stars)
+        agents.filter(a => a.tier === 1).forEach(agent => {{
+            const x = agent.x * scale;
+            const y = agent.y * scale;
+            ctx.fillStyle = '#ffd700';
+            drawStar(ctx, x, y, 5, 10, 5);
         }});
 
         function drawStar(ctx, cx, cy, spikes, outerRadius, innerRadius) {{
@@ -233,6 +235,7 @@ def main():
 
     print("Initializing simulation...")
     sim = LLMSimulation(config=config, use_mock_llm=True)
+    sim.tier1_processor.scorer.global_budget = 50  # Limit T1 to 50 agents
 
     print(f"Running simulation for 500 ticks...")
     for i in range(500):

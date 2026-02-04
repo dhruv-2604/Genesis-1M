@@ -95,8 +95,14 @@ class Tier1Processor:
             arrays, neighbor_data, resource_seekers, current_tick
         )
 
-        # 4. Select promotions within budget
-        promoted_ids = self.scorer.select_promotions(candidates, current_tick)
+        # 4. Select promotions within budget (accounting for current T1 count)
+        # Only promote new agents if under budget
+        current_t1_count = len(self.tier1_agents)
+        available_slots = max(0, self.scorer.global_budget - current_t1_count)
+
+        # Filter to only NEW promotions (not already in tier1_agents)
+        new_candidates = [c for c in candidates if c.agent_id not in self.tier1_agents]
+        promoted_ids = self.scorer.select_promotions(new_candidates[:available_slots], current_tick)
 
         # 5. Submit new inference requests for promoted + existing Tier 1
         all_tier1_ids = set(promoted_ids) | set(self.tier1_agents.keys())
