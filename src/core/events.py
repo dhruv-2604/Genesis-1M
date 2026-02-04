@@ -33,10 +33,24 @@ class Event:
     timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> dict:
+        # Convert numpy types to Python native for JSON serialization
+        import numpy as np
+
+        def convert(obj):
+            if isinstance(obj, (np.integer, np.int32, np.int64)):
+                return int(obj)
+            elif isinstance(obj, (np.floating, np.float32, np.float64)):
+                return float(obj)
+            elif isinstance(obj, dict):
+                return {k: convert(v) for k, v in obj.items()}
+            elif isinstance(obj, (list, tuple)):
+                return [convert(v) for v in obj]
+            return obj
+
         return {
             'type': self.type.name,
-            'tick': self.tick,
-            'data': self.data,
+            'tick': int(self.tick),
+            'data': convert(self.data),
             'timestamp': self.timestamp,
         }
 
