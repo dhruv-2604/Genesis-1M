@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-sim"
+version = "0.1.0"
+description = "Million Agent Civilization Simulation Engine"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Agent Sim Team"}
+]
+keywords = ["simulation", "agents", "ai", "civilization"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "numpy>=1.24.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+distributed = [
+    "ray[default]>=2.9.0",
+]
+llm = [
+    "vllm>=0.3.0",
+    "transformers>=4.35.0",
+]
+memory = [
+    "lancedb>=0.3.0",
+    "sentence-transformers>=2.2.0",
+]
+viz = [
+    "matplotlib>=3.7.0",
+    "plotly>=5.15.0",
+]
+all = [
+    "agent-sim[dev,distributed,llm,memory,viz]",
+]
+
+[project.scripts]
+agent-sim = "run_simulation:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "N"]
+ignore = ["E501"]

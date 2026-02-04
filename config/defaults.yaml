@@ -1,0 +1,117 @@
+# Agent Civilization Simulation - Default Configuration
+
+# World settings
+world:
+  size: 10000.0           # World is size x size units
+  cell_size: 50.0         # Spatial hash grid cell size
+  wrap_around: true       # Toroidal world (edges connect)
+
+# Agent settings
+agents:
+  initial_count: 100000   # Starting population
+  max_count: 1100000      # Hard limit
+
+  # Lifecycle
+  max_age: 30000          # Ticks (~80 years if 1 tick = 1 day)
+  maturity_age: 5000      # Can reproduce after this age
+
+  # Energy
+  starting_energy: 100.0
+  max_energy: 100.0
+  base_energy_drain: 0.1  # Per tick
+  death_energy: 0.0       # Die at this energy
+
+  # Reproduction
+  reproduction_energy_threshold: 50.0  # Min energy to reproduce
+  reproduction_energy_cost: 30.0       # Energy spent per parent
+  reproduction_cooldown: 100           # Ticks between reproductions
+  child_starting_energy: 50.0
+
+# FSM settings
+fsm:
+  hunger_threshold: 30.0      # Seek food below this
+  satiated_threshold: 70.0    # Can consider mating above this
+  rest_threshold: 90.0        # Will rest above this
+  critical_threshold: 10.0    # Desperate/interesting situations
+
+# Movement
+movement:
+  base_speed: 1.0
+  flee_multiplier: 1.5
+  vision_range: 50.0          # Base detection radius
+  interaction_range: 10.0     # Range for interactions
+
+# Tier system
+tiers:
+  # Tier 3: FSM-only (no LLM)
+  tier3:
+    enabled: true
+
+  # Tier 2: Weighted heuristics (future)
+  tier2:
+    enabled: false
+
+  # Tier 1: LLM-driven (Phase 2)
+  tier1:
+    enabled: false
+    max_per_tick: 500         # Budget for LLM calls
+    model: "llama-3-8b"
+
+# Promotion settings (Phase 2)
+promotion:
+  enabled: false
+  weights:
+    neighbor_density: 0.1
+    resource_conflict: 2.0
+    novel_encounter: 1.5
+    low_energy: 1.0
+
+  global_budget: 500          # Max promotions per tick
+
+# Resources (Phase 4)
+resources:
+  enabled: true
+  types:
+    berries:
+      spawn_rate: 0.01        # Per cell per tick
+      max_per_cell: 10
+      energy_value: 20.0
+    meat:
+      spawn_rate: 0.001
+      max_per_cell: 3
+      energy_value: 50.0
+      requires_tool: true
+    water:
+      spawn_rate: 0.0         # Fixed locations
+      energy_value: 10.0
+
+  regeneration_rate: 0.01     # Global regeneration multiplier
+
+# Simulation settings
+simulation:
+  seed: 42                    # Random seed (null for random)
+  tick_rate_target: 100       # Target ticks per second
+
+  # Checkpointing
+  checkpoint_interval: 1000   # Ticks between checkpoints
+  checkpoint_dir: "checkpoints"
+  max_checkpoints: 10         # Keep only N most recent
+
+  # Logging
+  log_interval: 100           # Ticks between summary logs
+  event_log_dir: "logs/events"
+
+  # Performance
+  batch_size: 10000           # Agents per batch for vectorized ops
+
+# Ray cluster settings
+ray:
+  enabled: true
+  num_workers: 8              # Ray actors for spatial stripes
+  object_store_memory: 10_000_000_000  # 10GB
+
+# Visualization (future)
+visualization:
+  enabled: false
+  update_interval: 10         # Ticks between viz updates
+  heatmap_resolution: 100     # Grid size for density map

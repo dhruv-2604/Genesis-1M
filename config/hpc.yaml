@@ -1,0 +1,81 @@
+# HPC Configuration for PACE ICE
+# Optimized for H100 GPUs and large-scale runs
+
+world:
+  size: 50000.0         # Large world for 1M agents
+  cell_size: 100.0      # Larger cells for efficiency
+  wrap_around: true
+
+agents:
+  initial_count: 100000
+  max_count: 1500000    # Allow growth to 1.5M
+
+  max_age: 30000
+  maturity_age: 5000
+
+  starting_energy: 100.0
+  max_energy: 100.0
+  base_energy_drain: 0.1
+
+  reproduction_energy_threshold: 50.0
+  reproduction_energy_cost: 30.0
+  reproduction_cooldown: 100
+  child_starting_energy: 50.0
+
+fsm:
+  hunger_threshold: 30.0
+  satiated_threshold: 70.0
+  rest_threshold: 90.0
+  critical_threshold: 10.0
+
+movement:
+  base_speed: 1.0
+  flee_multiplier: 1.5
+  vision_range: 100.0     # Larger vision for sparse world
+  interaction_range: 20.0
+
+tiers:
+  tier3:
+    enabled: true
+  tier2:
+    enabled: false
+  tier1:
+    enabled: false       # Enable when vLLM is ready
+    max_per_tick: 1000
+    model: "meta-llama/Meta-Llama-3-8B-Instruct"
+
+resources:
+  enabled: true
+  types:
+    berries:
+      spawn_rate: 0.005  # Lower spawn for large world
+      max_per_cell: 20
+      energy_value: 20.0
+    meat:
+      spawn_rate: 0.001
+      max_per_cell: 5
+      energy_value: 50.0
+      requires_tool: true
+
+simulation:
+  seed: 42
+  tick_rate_target: 100
+
+  # Checkpointing to scratch storage
+  checkpoint_interval: 10000
+  checkpoint_dir: "~/scratch/agent-sim/checkpoints"
+  max_checkpoints: 20
+
+  # Event logging
+  log_interval: 1000
+  event_log_dir: "~/scratch/agent-sim/events"
+
+  batch_size: 50000     # Larger batches for HPC
+
+ray:
+  enabled: true
+  num_workers: 32       # Scale based on nodes
+  object_store_memory: 100_000_000_000  # 100GB
+
+visualization:
+  enabled: false        # No viz on HPC
