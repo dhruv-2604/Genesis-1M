@@ -28,15 +28,23 @@ class FSMState(IntEnum):
 
 # Gene indices for trait lookup
 class GeneIndex(IntEnum):
+    # Physical traits (affect FSM mechanics)
     SPEED = 0           # Movement speed multiplier (0.5 - 1.5)
     METABOLISM = 1      # Energy consumption rate (0.5 - 1.5)
-    SOCIABILITY = 2     # Tendency to approach others (0 - 1)
-    AGGRESSION = 3      # Fight vs flight tendency (0 - 1)
-    FERTILITY = 4       # Reproduction success rate (0 - 1)
-    VISION_RANGE = 5    # Detection radius multiplier (0.5 - 1.5)
-    STRENGTH = 6        # Combat/hunting effectiveness (0 - 1)
-    INTELLIGENCE = 7    # Promotion priority boost (0 - 1)
-    NUM_GENES = 8
+    FERTILITY = 2       # Reproduction success rate (0 - 1)
+    VISION_RANGE = 3    # Detection radius multiplier (0.5 - 1.5)
+    STRENGTH = 4        # Combat/hunting effectiveness (0 - 1)
+
+    # Personality traits (injected into LLM prompts)
+    AGGRESSION = 5      # 0 = pacifist, 1 = violent/territorial
+    SOCIABILITY = 6     # 0 = loner, 1 = seeks groups
+    ALTRUISM = 7        # 0 = selfish, 1 = self-sacrificing
+    GREED = 8           # 0 = generous/shares, 1 = hoards everything
+    CURIOSITY = 9       # 0 = routine/conservative, 1 = explores/experiments
+    TRUST = 10          # 0 = paranoid/suspicious, 1 = naive/trusting
+    INTELLIGENCE = 11   # Promotion priority boost (0 - 1)
+
+    NUM_GENES = 12
 
 
 @dataclass
@@ -96,6 +104,22 @@ class AgentState:
     @property
     def aggression(self) -> float:
         return self.genes[GeneIndex.AGGRESSION]
+
+    @property
+    def altruism(self) -> float:
+        return self.genes[GeneIndex.ALTRUISM]
+
+    @property
+    def greed(self) -> float:
+        return self.genes[GeneIndex.GREED]
+
+    @property
+    def curiosity(self) -> float:
+        return self.genes[GeneIndex.CURIOSITY]
+
+    @property
+    def trust(self) -> float:
+        return self.genes[GeneIndex.TRUST]
 
     @property
     def is_alive(self) -> bool:

@@ -9,7 +9,7 @@ from ..world.resources import ResourceType
 from ..memory import MemoryManager, MemoryType
 from .vllm_backend import VLLMBackend, MockVLLMBackend, InferenceResponse, create_backend
 from .promotion import PromotionScorer, PromotionCandidate
-from .prompts import build_prompt, build_system_prompt, PRIMITIVE_HUMAN_SYSTEM
+from .prompts import build_prompt, build_system_prompt
 
 
 @dataclass
@@ -307,13 +307,14 @@ class Tier1Processor:
         )
 
     def _get_agent_data(self, arrays: AgentArrays, idx: int, agent_id: int) -> Dict:
-        """Extract agent data for prompt"""
+        """Extract agent data for prompt, including personality genes"""
         return {
             "id": agent_id,
             "name": f"Human-{agent_id}",
             "energy": float(arrays.energy[idx]),
             "age": int(arrays.age[idx]),
             "fsm_state": int(arrays.fsm_state[idx]),
+            "genes": arrays.genes[idx].tolist(),  # For personality injection
             "inventory": {},  # TODO: integrate inventory
         }
 
